@@ -59,13 +59,23 @@ app.get('/api/cities', async (req: Request, res: Response) => {
 app.post('/cities', async (req: Request, res: Response) => {
   try {
     const { cityName, count } = req.body;
+
+    // Check if city already exists (case-insensitive)
+    const existingCity = await City.findOne({ cityName: { $regex: new RegExp(`^${cityName}$`, 'i') } });
+
+    if (existingCity) {
+      return res.status(409).json({ error: 'City with this name already exists.' });
+    }
+
     const newCity = new City({ cityName, count });
     await newCity.save();
+
     res.status(201).json(newCity);
   } catch (err) {
     res.status(400).json({ error: 'Failed to create city' });
   }
 });
+
 
 // Read city by ID
 app.get('/cities/:id', async (req: Request, res: Response) => {
@@ -81,13 +91,33 @@ app.get('/cities/:id', async (req: Request, res: Response) => {
 // Update city
 app.put('/cities/:id', async (req: Request, res: Response) => {
   try {
-    const updatedCity = await City.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const { cityName, count } = req.body;
+
+    // 🔍 Check if another city already has this name (excluding the current city)
+    const existingCity = await City.findOne({
+      cityName: { $regex: new RegExp(`^${cityName}$`, 'i') }, // Case-insensitive
+      _id: { $ne: req.params.id } // Exclude the city being updated
+    });
+
+    if (existingCity) {
+      return res.status(400).json({ error: 'City with this name already exists.' });
+    }
+
+    // ✅ Proceed to update if name is unique
+    const updatedCity = await City.findByIdAndUpdate(
+        req.params.id,
+        { cityName, count },
+        { new: true }
+    );
+
     if (!updatedCity) return res.status(404).json({ error: 'City not found' });
+
     res.json(updatedCity);
   } catch (err) {
     res.status(400).json({ error: 'Failed to update city' });
   }
 });
+
 
 // Delete city
 app.delete('/cities/:id', async (req: Request, res: Response) => {

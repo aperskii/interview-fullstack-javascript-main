@@ -24,7 +24,8 @@ const App: React.FC = () => {
     const [loading, setLoading] = useState(false);
 
     const [newCityName, setNewCityName] = useState('');
-    const [newCityCount, setNewCityCount] = useState(0);
+    const [newCityCount, setNewCityCount] = useState(1);
+    const [errorMessage, setErrorMessage] = useState('');
 
     const fetchCities = async () => {
         try {
@@ -53,32 +54,68 @@ const App: React.FC = () => {
     };
 
     const createCity = async () => {
-        if (!newCityName || newCityCount < 0) return;
+        // Frontend validation
+        if (!newCityName.trim()) {
+            setErrorMessage('City name cannot be empty.');
+            return;
+        }
+
+        if (newCityCount < 1) {
+            setErrorMessage('Count must be at least 1.');
+            return;
+        }
 
         try {
             await axios.post('http://localhost:8000/cities', {
-                cityName: newCityName,
+                cityName: newCityName.trim(),
                 count: newCityCount
             });
+
+            // Reset form and clear error
             setNewCityName('');
-            setNewCityCount(0);
+            setNewCityCount(1); // Use 1 as default since 0 is invalid
+            setErrorMessage('');
             fetchCities();
-        } catch (error) {
+        } catch (error: unknown) {
+            if (axios.isAxiosError(error) && error.response && error.response.data && error.response.data.error) {
+                setErrorMessage(error.response.data.error);
+            } else {
+                setErrorMessage('Error creating city.');
+            }
             console.error('Error creating city:', error);
         }
     };
 
+
     const updateCity = async (city: City) => {
+        // Frontend validation
+        if (!city.cityName.trim()) {
+            setErrorMessage('City name cannot be empty.');
+            return;
+        }
+
+        if (city.count < 1) {
+            setErrorMessage('Count must be at least 1.');
+            return;
+        }
+
         try {
             await axios.put(`http://localhost:8000/cities/${city._id}`, {
-                cityName: city.cityName,
+                cityName: city.cityName.trim(),
                 count: city.count
             });
-            fetchCities();
-        } catch (error) {
+            setErrorMessage(''); // Clear any previous errors
+            fetchCities(); // Refresh cities list
+        } catch (error: unknown) {
+            if (axios.isAxiosError(error) && error.response && error.response.data && error.response.data.error) {
+                setErrorMessage(error.response.data.error); // Show backend error
+            } else {
+                setErrorMessage('Error updating city.');
+            }
             console.error('Error updating city:', error);
         }
     };
+
 
     const deleteCity = async (cityId: string) => {
         try {
@@ -134,6 +171,12 @@ const App: React.FC = () => {
                         Create
                     </button>
                 </div>
+                {/* Error Message Display */}
+                {errorMessage && (
+                    <div className="text-red-500 text-center mb-4">
+                        {errorMessage}
+                    </div>
+                )}
 
                 {/* Total Count */}
                 <div className="text-center mb-4 text-gray-600">
@@ -202,7 +245,11 @@ const App: React.FC = () => {
                                                         Update
                                                     </button>
                                                     <button
-                                                        onClick={() => deleteCity(city._id)}
+                                                        onClick={() => {
+                                                            if (window.confirm(`Are you sure you want to delete ${city.cityName}?`)) {
+                                                                deleteCity(city._id);
+                                                            }
+                                                        }}
                                                         className="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600 transition-all"
                                                     >
                                                         Delete
